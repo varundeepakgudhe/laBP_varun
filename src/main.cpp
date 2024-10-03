@@ -145,21 +145,13 @@ int main(int argc, const char *argv[])
     stringstream infile;
     stringstream ms_ss;
     stringstream sstat_ss;
-    if (argc > 1)
-    {
-        infile << "inLABP_" << argv[1] << ".pars";
-        ms_ss << "outLABP_" << argv[1] << ".sites";
-        sstat_ss << "outLABP_" << argv[1] << ".stats";
-    }
-    else
-    {
-        infile << "inLABP.pars";
-        ms_ss << "outLABP_" << rd() << ".sites";
-        sstat_ss << "outLABP_" << rd() << ".stats";
-    }
-    // Convert argv[2] (string) to an integer
-    int py_nruns = std::stoi(argv[2]);
-    Parameters params(infile.str().c_str(), py_nruns);
+
+    infile << "inLABP.pars";
+    ms_ss << "outLABP_" << rd() << ".sites";
+    sstat_ss << "outLABP_" << rd() << ".stats";
+
+    std::vector<std::string> param_vec(argv + 1, argv + argc);
+    Parameters params(infile.str().c_str(), param_vec);
 
     unsigned int nRuns = params.paramData->nRuns;
     unsigned nSites = params.paramData->n_SNPs;

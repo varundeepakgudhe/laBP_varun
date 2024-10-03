@@ -35,52 +35,28 @@ using std::shared_ptr;
 
 //======================================================================
 
-Parameters::Parameters(const char *insstring, int py_nruns)
+Parameters::Parameters(const char *insstring, const std::vector<std::string> &param_vec)
 { // Constructor.  Reads parameter values from the file parameters.txt
 
     DBG("Parameters:: Constructing...")
 
     paramData.reset(new ParameterData);
 
-    ifstream fin(insstring);
-    string line;
     int temp;
     double doubtemp;
+    std::istringstream iss;
 
     // Read in different params
     //  number of runs
-    getline(fin, line);
-    if (!fin)
-    {
-        std::cerr << "No pars file. \n";
-        exit(1);
-    }
-
-    istringstream iss(line);
-    while (iss >> temp)
-    {
-        paramData->nRuns = temp;
-    }
-    std::cerr << "Number of runs: " << py_nruns << '\n';
+    paramData->nRuns = std::stoi(param_vec[0]);
+    std::cerr << "Number of runs: " << paramData->nRuns << '\n';
 
     // Should we simulate kingman coalescent? (i.e. exponential waiting times). If false, does generation by generation
-    getline(fin, line);
-    iss.clear();
-    iss.str(line);
-    while (iss >> temp)
-    {
-        paramData->kingman = (bool)temp;
-    }
+    paramData->kingman = (param_vec[1] == "1"); // this can also be assigned to true
     std::cerr << "Assuming Kingman? " << paramData->kingman << '\n';
 
     // Simulate drift trajectory?
-    getline(fin, line);
-    iss.clear();
-    iss.str(line);
-    while (iss >> temp)
-    {
-        paramData->drift = (bool)temp;
-    }
+    paramData->drift = (param_vec[2] == "1");
     std::cerr << "Simulating drift? " << paramData->drift << '\n';
 
     if (paramData->drift)
@@ -90,23 +66,13 @@ Parameters::Parameters(const char *insstring, int py_nruns)
     }
 
     // Output ms-formatted haplotypes?
-    getline(fin, line);
-    iss.clear();
-    iss.str(line);
-    while (iss >> temp)
-    {
-        paramData->msOutput = (bool)temp;
-    }
+    paramData->msOutput = (param_vec[3] == "1");
     std::cerr << "Output each set in ms format? " << paramData->msOutput << '\n';
 
     // Population Sizes
-    getline(fin, line);
-    iss.clear();
-    iss.str(line);
-    while (iss >> temp)
-    {
-        paramData->popSizeVec.push_back(temp);
-    }
+    iss.str(param_vec[4]);
+    paramData->popSizeVec = std::vector<unsigned int>(std::istream_iterator<int>(iss), std::istream_iterator<int>());
+
     std::cerr << "Population Sizes: ";
     for (int n = 0; n < (int)paramData->popSizeVec.size(); n++)
     {
@@ -118,13 +84,9 @@ Parameters::Parameters(const char *insstring, int py_nruns)
     unsigned int pops = paramData->popSizeVec.size();
 
     // Inversion initial frequencies
-    getline(fin, line);
     iss.clear();
-    iss.str(line);
-    while (iss >> doubtemp)
-    {
-        paramData->initialFreqs.push_back(doubtemp);
-    }
+    iss.str(param_vec[5]);
+    paramData->initialFreqs = std::vector<double>(std::istream_iterator<double>(iss), std::istream_iterator<double>());
 
     if (paramData->initialFreqs.size() != pops)
     {
@@ -140,13 +102,10 @@ Parameters::Parameters(const char *insstring, int py_nruns)
     std::cerr << '\n';
 
     // Simulate speciation?
-    getline(fin, line);
     iss.clear();
-    iss.str(line);
-    while (iss >> doubtemp)
-    {
-        paramData->speciation.push_back(doubtemp);
-    }
+    iss.str(param_vec[6]);
+    paramData->speciation = std::vector<double>(std::istream_iterator<double>(iss), std::istream_iterator<double>());
+
     if (paramData->speciation.at(0) == 1)
     {
         if (paramData->speciation.size() < 3)
@@ -162,13 +121,10 @@ Parameters::Parameters(const char *insstring, int py_nruns)
     }
 
     // Simulate demography?
-    getline(fin, line);
     iss.clear();
-    iss.str(line);
-    while (iss >> doubtemp)
-    {
-        paramData->demography.push_back(doubtemp);
-    }
+    iss.str(param_vec[7]);
+    paramData->demography = std::vector<double>(std::istream_iterator<double>(iss), std::istream_iterator<double>());
+
     if (paramData->demography.at(0) == 1)
     {
         if (paramData->speciation.size() < 3)
@@ -185,13 +141,9 @@ Parameters::Parameters(const char *insstring, int py_nruns)
     }
 
     // Age of inversion in number of generations (EX: 1500)
-    getline(fin, line);
-    iss.clear();
-    iss.str(line);
-    while (iss >> temp)
-    {
-        paramData->inv_age = temp;
-    }
+    paramData->inv_age = std::stoi(param_vec[8]);
+
+    // change the below ones also to paramData->inv_age instead of param_vec[8]
     std::cerr << "Age of inversion = " << paramData->inv_age << '\n';
 
     if (paramData->inv_age > 0 && paramData->inv_age < std::max(paramData->demography.at(1), paramData->speciation.at(1)))
@@ -201,42 +153,26 @@ Parameters::Parameters(const char *insstring, int py_nruns)
     }
 
     // Migration rate (4Nm)
-    getline(fin, line);
+    // why is migRate a vector?
     iss.clear();
-    iss.str(line);
-    while (iss >> doubtemp)
-    {
-        paramData->migRate.push_back(doubtemp);
-    }
+    iss.str(param_vec[9]);
+    paramData->migRate = std::vector<double>(std::istream_iterator<double>(iss), std::istream_iterator<double>());
+
     std::cerr << "Migration rate (pop0<-->1) = " << paramData->migRate[0] << '\n';
 
     // bases per Morgan in the hh genotype.
-    getline(fin, line);
-    iss.clear();
-    iss.str(line);
-    while (iss >> doubtemp)
-    {
-        paramData->BasesPerMorgan = doubtemp;
-    }
+    paramData->BasesPerMorgan = std::stod(param_vec[10]);
     std::cerr << "Bases per Morgan in homokaryotypic recombination " << paramData->BasesPerMorgan << '\n';
 
     // Random phi?
-    getline(fin, line);
-    iss.clear();
-    iss.str(line);
-    while (iss >> temp)
-    {
-        paramData->randPhi = (bool)temp;
-    }
+    paramData->randPhi = (param_vec[11] == "1");
     std::cerr << "Random phi values? (if 1, range below. if 0, single value read below) " << paramData->randPhi << '\n';
 
-    getline(fin, line);
+    // why is phi_range a  vector?
     iss.clear();
-    iss.str(line);
-    while (iss >> doubtemp)
-    {
-        paramData->phi_range.push_back(doubtemp);
-    }
+    iss.str(param_vec[12]);
+    paramData->phi_range = std::vector<double>(std::istream_iterator<double>(iss), std::istream_iterator<double>());
+
     if (paramData->randPhi)
     {
         std::cerr << "Random gene flux (phi) range = " << paramData->phi_range[0] << " - " << paramData->phi_range[1] << '\n';
@@ -248,26 +184,22 @@ Parameters::Parameters(const char *insstring, int py_nruns)
 
     // the range of the inversion
     vector<double> invtemp;
-    getline(fin, line);
+
     iss.clear();
-    iss.str(line);
-    while (iss >> doubtemp)
-    {
-        invtemp.push_back(doubtemp);
-    }
+    iss.str(param_vec[13]);
+    invtemp = std::vector<double>(std::istream_iterator<double>(iss), std::istream_iterator<double>());
+
     paramData->invRange.L = invtemp[0] / paramData->BasesPerMorgan;
     paramData->invRange.R = invtemp[1] / paramData->BasesPerMorgan;
     std::cerr << "Inversion from: " << invtemp[0] << " to " << invtemp[1] << " (" << paramData->invRange.L << " - " << paramData->invRange.R << " recUnits)\n";
 
     // Fixed S? Value of S or sequence length (bases), Theta
     vector<double> stemp;
-    getline(fin, line);
+
     iss.clear();
-    iss.str(line);
-    while (iss >> doubtemp)
-    {
-        stemp.push_back(doubtemp);
-    }
+    iss.str(param_vec[14]);
+    stemp = std::vector<double>(std::istream_iterator<double>(iss), std::istream_iterator<double>());
+
     paramData->fixedS = (bool)stemp[0];
     paramData->n_SNPs = (int)stemp[1];
     if (paramData->fixedS)
@@ -282,19 +214,12 @@ Parameters::Parameters(const char *insstring, int py_nruns)
     }
 
     // random positions of SNPs?
-    getline(fin, line);
-    iss.clear();
-    iss.str(line);
-    while (iss >> temp)
-    {
-        paramData->randSNP = (bool)temp;
-    }
+    paramData->randSNP = (param_vec[15] == "1");
     std::cerr << "Markers in random locations? " << paramData->randSNP << '\n';
 
     // range (positions of begin-end) where the SNPs are -- in bases
-    getline(fin, line);
     iss.clear();
-    iss.str(line);
+    iss.str(param_vec[16]);
     while (iss >> doubtemp)
     {
         paramData->snpPositions.push_back(doubtemp / paramData->BasesPerMorgan);
@@ -325,13 +250,8 @@ Parameters::Parameters(const char *insstring, int py_nruns)
 
     // should the sample be random?
     bool randomSample = false;
-    getline(fin, line);
-    iss.clear();
-    iss.str(line);
-    while (iss >> temp)
-    {
-        randomSample = (bool)temp;
-    }
+
+    randomSample = (param_vec[17] == "1");
     std::cerr << "Random sample of carriers? " << randomSample << '\n';
 
     paramData->nCarriers.resize(pops);
@@ -339,13 +259,11 @@ Parameters::Parameters(const char *insstring, int py_nruns)
     if (randomSample)
     {
         vector<int> tempRead;
-        getline(fin, line);
+
         iss.clear();
-        iss.str(line);
-        while (iss >> temp)
-        {
-            tempRead.push_back(temp);
-        }
+        iss.str(param_vec[18]);
+        tempRead = std::vector<int>(std::istream_iterator<int>(iss), std::istream_iterator<int>());
+
         if (tempRead.size() != pops)
         {
             std::cerr << "Inconsistent number of sample sizes found (should be equal to number of pops)\n";
@@ -362,12 +280,13 @@ Parameters::Parameters(const char *insstring, int py_nruns)
     else
     { // number of S, I carriers in each pop
         int totalSample = 0;
-        for (int p = 0; p < pops; ++p)
+        for (int p = 0; p < pops; ++p) // why for loop, its gonna execute only once right?
         {
             std::cerr << "Sample in Pop " << p << ": ";
-            getline(fin, line);
+
             iss.clear();
-            iss.str(line);
+            iss.str(param_vec[19]);
+
             while (iss >> temp)
             {
                 paramData->nCarriers.at(p).push_back(temp);
@@ -379,8 +298,6 @@ Parameters::Parameters(const char *insstring, int py_nruns)
         if (totalSample == 2)
             std::cerr << "Sample size = 2 || Warning: Informative sites length function won't work.\n";
     }
-
-    fin.close();
 
 } // end constructor
 

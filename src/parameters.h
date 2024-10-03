@@ -31,7 +31,7 @@ public:
     shared_ptr<ParameterData> paramData;
 
     Parameters();
-    Parameters(const char *insstring, int py_nruns);
+    Parameters(const char *insstring, const std::vector<std::string> &param_vec);
     ~Parameters();
     vector<unsigned int> getPopulationSizes();
     vector<unsigned int> getSamplePerPop();
