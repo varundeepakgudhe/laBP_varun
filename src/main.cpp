@@ -57,7 +57,9 @@ using std::weak_ptr;
 
 // Global declarations:
 std::random_device rd;
-std::mt19937_64 gen(rd()); // Random generator declared globally. can be seeded in main.cpp and then used elsewhere
+auto seed = rd();
+
+std::mt19937_64 gen(seed); // Random generator declared globally. can be seeded in main.cpp and then used elsewhere
 
 vector<vector<double>> buildMigMatrix(Parameters &p)
 {
@@ -132,7 +134,15 @@ vector<vector<double>> buildMigMatrix(Parameters &p)
 
 int main(int argc, const char *argv[])
 {
-    std::cerr << "Seed: " << rd() << '\n';
+    std::cerr << "Random Seed: " << seed << '\n';
+
+    auto input_seed = std::stoi(argv[1]);
+    if (input_seed != -1)
+    {
+        std::cerr << "Input Seed: " << input_seed << '\n';
+        seed = input_seed;
+        gen.seed(input_seed);
+    }
     //// A static seed, useful for debuggin:
     // gen.seed(42U);
 
@@ -147,10 +157,10 @@ int main(int argc, const char *argv[])
     stringstream sstat_ss;
 
     infile << "inLABP.pars";
-    ms_ss << "outLABP_" << rd() << ".sites";
-    sstat_ss << "outLABP_" << rd() << ".stats";
+    ms_ss << "tests/outLABP_" << seed << ".sites";
+    sstat_ss << "tests/outLABP_" << seed << ".stats";
 
-    std::vector<std::string> param_vec(argv + 1, argv + argc);
+    std::vector<std::string> param_vec(argv + 2, argv + argc);
     Parameters params(infile.str().c_str(), param_vec);
 
     unsigned int nRuns = params.paramData->nRuns;
