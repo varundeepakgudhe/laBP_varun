@@ -1,4 +1,4 @@
-Random Seed: 2651221739
+Random Seed: 1735370792
 Input Seed: 1
 Number of runs: 1
 Assuming Kingman? 1
@@ -58,4 +58,4 @@ Clusters now:
 Mean LD (E[T1,n]) = 1.5243
 Mean TMRCA per site (E[T1]...E[Tn])
  1.3716 3.70641 1.20721 1.74693 2.23081 0.850762 0.74905 0.719949 1.43263 1.11133
-Elapsed time: 4.66228s
+Elapsed time: 4.74518s

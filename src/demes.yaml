@@ -1,31 +1,38 @@
-description: Two-populations one-epoch demography
+description: 5 populations with hierarchical merges
 time_units: generations
+generation_time: 1
+
 demes:
-  - name: ancestor
+  - name: pop0
+    start_time: 0
     epochs:
-      - start_size: 10000 # Ancestor population size
-        end_time: 10000 
-  - name: population1
-    description: "First population"
-    ancestors: ["ancestor"]
-    start_time: 10000
+      - end_time: 1000
+        start_size: 1000
+
+  - name: pop1
+    start_time: 0
     epochs:
-      - start_size: 10000 # Population size
-        end_time: 0 # Present time
-  - name: population2
-    description: "Second population"
-    ancestors: ["ancestor"]
-    start_time: 10000
+      - end_time: 1000
+        start_size: 1000
+
+  - name: pop2
+    start_time: 1000
+    ancestors: [pop0, pop1]
+    proportions: [0.5, 0.5]
     epochs:
-      - start_size: 10000 # Population size
-        end_time: 0 # Present time
-  - name: population3  
-    description: "Third population"
-    ancestors: ["ancestor"]
-    start_time: 10000
+      - end_time: 2000
+        start_size: 2000
+
+  - name: pop3
+    start_time: 0
     epochs:
-      - start_size: 10000
-        end_time: 0
-migrations:
-  - demes: ["population1", "population2", "population3"]
-    rate: 0.02
+      - end_time: 2000
+        start_size: 1000
+
+  - name: pop4
+    start_time: 2000
+    ancestors: [pop2, pop3]
+    proportions: [0.7, 0.3]
+    epochs:
+      - end_time: 5000
+        start_size: 3000

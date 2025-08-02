@@ -1,14 +1,12 @@
 #!/usr/bin/env python3
 import sys
 import yaml
-import demes
 import subprocess
 import argparse
 import json
 
 # Default file names for the YAML files.
 OTHER_YAML      = "src/other.yaml"
-DEMES_YAML      = "src/demes.yaml"
 DEMOGRAPHY_JSON = "src/demo_dict.json"   # your sparse‐demography map
 
 # The default parameters dictionary
@@ -19,9 +17,9 @@ parameters = {
     "drift_sim":    "0",
     "msOutput":     "1",
     "popSizeVec":   "10000 10000 10000",
-    "inv_freq":     "0.2 0.3 0.4",
-    "speciation":   "1 0 2 1000 0.3 0 1 2000 0.2",
-    "demography":   "0 0 0",             # placeholder, will be overridden by JSON
+    "inv_freq":     "0.2 0.4 0.1",
+    "speciation":   "1 0 2 1000 0.3",
+    "demography":   "0 0 0",
     "inv_age":      "0",
     "migRate":      "0.02",
     "BasesPerMorgan":"1e8",
@@ -36,7 +34,7 @@ parameters = {
     "nCarriers":    "10 0"
 }
 
-# 1) Load other.yaml
+# 1) Load other.yaml and override defaults
 try:
     with open(OTHER_YAML, 'r') as f:
         other_params = yaml.safe_load(f)
@@ -44,30 +42,12 @@ except Exception as e:
     print(f"Error loading {OTHER_YAML}: {e}", file=sys.stderr)
     sys.exit(1)
 
-# Override keys except those driven by demes.yaml or JSON
-for key in other_params:
-    if key in parameters and key not in ["popSizeVec", "speciation", "migRate"]:
-        parameters[key] = str(other_params[key])
+# Override *all* keys from other.yaml
+for key, val in other_params.items():
+    if key in parameters:
+        parameters[key] = str(val)
 
-# 2) Load demography graph from demes.yaml
-try:
-    graph = demes.load(DEMES_YAML)
-except Exception as e:
-    print(f"Error loading {DEMES_YAML}: {e}", file=sys.stderr)
-    sys.exit(1)
-
-# Update popSizeVec from demes.yaml (all non-ancestor demes)
-pop_sizes = []
-for deme in graph.demes:
-    if deme.name != "ancestor":
-        pop_sizes.append(str(deme.epochs[0].start_size))
-parameters["popSizeVec"] = " ".join(pop_sizes)
-
-# 3) Update migRate from the first migration in demes.yaml
-if graph.migrations:
-    parameters["migRate"] = str(graph.migrations[0].rate)
-
-# 4) Interactive tweak (unchanged)
+# 2) (Optional) Interactive tweak
 def print_parameters(params):
     for k, v in params.items():
         print(f"{k}: {v}")
@@ -79,11 +59,8 @@ def modify_params(parameters):
         user_input = input("\nEnter parameters to modify (e.g., --seed 2 --nruns 3): ")
         parser = argparse.ArgumentParser()
         for key in parameters:
-            if key in ["popSizeVec","inv_freq","speciation","demography","invRange",
-                       "fixedSNPs","tempRead","nCarriers","snpPositions"]:
-                parser.add_argument(f"--{key}", nargs='+')
-            else:
-                parser.add_argument(f"--{key}")
+            # list‐valued vs scalar
+            parser.add_argument(f"--{key}", nargs='+' if ' ' in parameters[key] else None)
         args = parser.parse_args(user_input.split())
         for key, val in vars(args).items():
             if val is not None:
@@ -95,6 +72,7 @@ def modify_params(parameters):
 
 modify_params(parameters)
 
+# 3) (Optional) Load your demography JSON map for explicit demography events
 try:
     with open(DEMOGRAPHY_JSON, 'r') as f:
         demog_map = json.load(f)
@@ -108,6 +86,7 @@ if demog_map:
         demog_entries += [str(int(x)) for x in sizes]
     parameters["demography"] = " ".join(demog_entries)
 
+# 4) Emit final list in the exact order main.cpp expects
 keys_order = [
     "seed","nruns","kingman_coal","drift_sim","msOutput",
     "popSizeVec","inv_freq","speciation","demography","inv_age",
@@ -120,7 +99,7 @@ print("\nFinal parameters being passed:")
 for k in keys_order:
     print(f"{k}: {parameters[k]}")
 
-# 7) Invoke the C++ executable
+# 5) Invoke the C++ executable
 command = ["./executables/labp_v19"] + args_list
 result = subprocess.run(command, capture_output=True, text=True)
 
