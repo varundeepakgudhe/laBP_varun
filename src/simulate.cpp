@@ -10,7 +10,7 @@
 // #define NDEBUG
 // #define CURRENTDEBUGGER
 // #define COALDBGR
-#define RCDBGR
+#define RCDBGR // activate this to make all the debuggers work.
 
 // Includes from STL:
 
@@ -201,7 +201,7 @@ unsigned short World::simulateGeneration(vector<vector<double>> &mig_prob)
         forceAllCoal();
 
     return nEvents;
-}
+} // This is the end of the simulate generation.
 
 bool World::timeCheck(double waiting, double Rate)
 {
@@ -269,6 +269,7 @@ void World::demoChange() // we are ignoring but understand this.
     for (int pop = 0; pop < worldData->popSize.size(); ++pop)
     {
         worldData->popSize.at(pop) = worldData->popSize.at(pop) * worldData->epoch_Ncoef;
+        // worldData->popSize.at(pop) =
     }
 }
 

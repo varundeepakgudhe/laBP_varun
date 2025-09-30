@@ -47,7 +47,7 @@ parameters = {
     "popSizeVec": "10000 10000",
     "inv_freq": "0.2 0.4",
     "speciation": "1 10000 0.2", #the third index is ancestor freq.
-    "demography": "0 0 0",
+    "demography": "1 10000 0",
     "inv_age": "0",
     "migRate": "0.02",
     "BasesPerMorgan": "1e8",

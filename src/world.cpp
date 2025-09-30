@@ -89,7 +89,7 @@ World::World(shared_ptr<Parameters::ParameterData> p)
 				worldData->epochType.push_back(2);
 				worldData->epochType.push_back(1);
 			}
-		}
+		} // what if we have few speciation events and multiple demography or vise versa.
 		else
 		{
 			worldData->epoch_breaks.push_back(p->demography.at(1));

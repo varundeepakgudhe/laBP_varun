@@ -1,4 +1,4 @@
-Random Seed: 4123422462
+Random Seed: 2115692868
 Input Seed: 1
 Number of runs: 1
 Assuming Kingman? 1
@@ -6,7 +6,7 @@ Simulating drift? 0
 Output each set in ms format? 1
 Population Sizes: 0 = 10000 | 1 = 10000 | 
 Frequencies of inverted chromosomes: 0 = 0.2 | 1 = 0.4 | 
-Speciation time: 1000
+Speciation time: 10000
 No demographic event.
 Age of inversion = 0
 Migration rate (pop0<-->1) = 0.02
@@ -21,7 +21,7 @@ Random sample of carriers? 0
 Sample in Pop 0: 10 0 
 Sample in Pop 1: 10 0 
 
-Mean LD (E[T1,n]) = 1.97969
+Mean LD (E[T1,n]) = 1.24935
 Mean TMRCA per site (E[T1]...E[Tn])
- 0.771502 0.771502 0.771502 0.771502 1.02609 2.74401 2.61994 3.47976 2.56602 2.56602
-Elapsed time: 0.221532s
+ 1.00789 1.00789 0.59777 0.59777 1.23957 1.23957 1.23957 1.23957 1.23957 1.23957
+Elapsed time: 0.115213s
