@@ -99,10 +99,18 @@ Parameters::Parameters(const char *insstring, const std::vector<std::string> &pa
     }
     std::cerr << '\n';
 
-    // Speciation (param_vec[6])
+    // Origin population (param_vec[6]) — population index where inversion originates
+    paramData->originPop = static_cast<unsigned int>(std::stoul(param_vec[6]));
+    std::cerr << "Origin population index = " << paramData->originPop << '\n';
+
+    // inv_size (param_vec[7]) — inversion length (bp or Morgans)
+    paramData->inv_size = std::stod(param_vec[7]);
+    std::cerr << "Inversion size (bp) = " << paramData->inv_size << '\n';
+
+    // Speciation (param_vec[8]) — speciation or merge event parameters
     // Speciation (flag + sinkPop + sourcePop + time + freq)
     iss.clear();
-    iss.str(param_vec[6]);
+    iss.str(param_vec[8]);
     paramData->speciation = vector<double>(std::istream_iterator<double>(iss), std::istream_iterator<double>());
     if (paramData->speciation.size() >= 5 && paramData->speciation[0] == 1) {
         unsigned sink   = (unsigned)paramData->speciation[1];
@@ -119,9 +127,9 @@ Parameters::Parameters(const char *insstring, const std::vector<std::string> &pa
     }
 
 
-    // Demography (param_vec[7])
+    // Demography (param_vec[9]) — population size changes or epoch events
     iss.clear();
-    iss.str(param_vec[7]);
+    iss.str(param_vec[9]);
     paramData->demography = vector<double>(std::istream_iterator<double>(iss), std::istream_iterator<double>());
     if (paramData->demography.at(0) == 1)
     {
@@ -138,27 +146,27 @@ Parameters::Parameters(const char *insstring, const std::vector<std::string> &pa
         std::cerr << "No demographic event.\n";
     }
 
-    // Age of inversion (param_vec[8])
-    paramData->inv_age = std::stoi(param_vec[8]);
+    // Age of inversion (param_vec[10])
+    paramData->inv_age = std::stoi(param_vec[10]);
     std::cerr << "Age of inversion = " << paramData->inv_age << '\n';
 
-    // Migration rate (param_vec[9])
+    // Migration rate (param_vec[11])
     iss.clear();
-    iss.str(param_vec[9]);
+    iss.str(param_vec[11]);
     paramData->migRate = vector<double>(std::istream_iterator<double>(iss), std::istream_iterator<double>());
     std::cerr << "Migration rate (pop0<-->1) = " << paramData->migRate[0] << '\n';
 
-    // Bases per Morgan (param_vec[10])
-    paramData->BasesPerMorgan = std::stod(param_vec[10]);
+    // Bases per Morgan (param_vec[12])
+    paramData->BasesPerMorgan = std::stod(param_vec[12]);
     std::cerr << "Bases per Morgan in homokaryotypic recombination " << paramData->BasesPerMorgan << '\n';
 
-    // Random phi flag (param_vec[11])
-    paramData->randPhi = (param_vec[11] == "1");
+    // Random phi flag (param_vec[13])
+    paramData->randPhi = (param_vec[13] == "1");
     std::cerr << "Random phi values? " << paramData->randPhi << '\n';
 
-    // Phi range (param_vec[12])
+    // Phi range (param_vec[14])
     iss.clear();
-    iss.str(param_vec[12]);
+    iss.str(param_vec[14]);
     paramData->phi_range = vector<double>(std::istream_iterator<double>(iss), std::istream_iterator<double>());
     if (paramData->randPhi)
     {
@@ -169,19 +177,19 @@ Parameters::Parameters(const char *insstring, const std::vector<std::string> &pa
         std::cerr << "Gene flux (phi) = " << paramData->phi_range[0] << '\n';
     }
 
-    // Inversion range (param_vec[13])
+    // Inversion range (param_vec[15])
     vector<double> invtemp;
     iss.clear();
-    iss.str(param_vec[13]);
+    iss.str(param_vec[15]);
     invtemp = vector<double>(std::istream_iterator<double>(iss), std::istream_iterator<double>());
     paramData->invRange.L = invtemp[0] / paramData->BasesPerMorgan;
     paramData->invRange.R = invtemp[1] / paramData->BasesPerMorgan;
     std::cerr << "Inversion from: " << invtemp[0] << " to " << invtemp[1] << " (" << paramData->invRange.L << " - " << paramData->invRange.R << " recUnits)\n";
 
-    // Fixed S and Theta (param_vec[14])
+    // Fixed S and Theta (param_vec[16])
     vector<double> stemp;
     iss.clear();
-    iss.str(param_vec[14]);
+    iss.str(param_vec[16]);
     stemp = vector<double>(std::istream_iterator<double>(iss), std::istream_iterator<double>());
     paramData->fixedS = static_cast<bool>(stemp[0]);
     paramData->n_SNPs = static_cast<int>(stemp[1]);
@@ -196,13 +204,13 @@ Parameters::Parameters(const char *insstring, const std::vector<std::string> &pa
         std::cerr << "Number of bases (non-recombining) to simulate: " << paramData->n_SNPs << ", with mutation rate: " << paramData->theta << '\n';
     }
 
-    // Random SNP positions flag (param_vec[15])
-    paramData->randSNP = (param_vec[15] == "1");
+    // Random SNP positions flag (param_vec[17])
+    paramData->randSNP = (param_vec[17] == "1");
     std::cerr << "Markers in random locations? " << paramData->randSNP << '\n';
 
-    // SNP positions (param_vec[16])
+    // SNP positions (param_vec[18])
     iss.clear();
-    iss.str(param_vec[16]);
+    iss.str(param_vec[18]);
     while (iss >> doubtemp)
     {
         paramData->snpPositions.push_back(doubtemp / paramData->BasesPerMorgan);
@@ -230,22 +238,20 @@ Parameters::Parameters(const char *insstring, const std::vector<std::string> &pa
         paramData->randSNP = false;
     }
 
-    // Random sample flag (param_vec[17])
-    // Random sample flag (param_vec[17])
-// Random sample flag (param_vec[17])
-    bool randomSample = (param_vec[17] == "1");
+    // Random sample flag (param_vec[19])
+    bool randomSample = (param_vec[19] == "1");
     std::cerr << "Random sample of carriers? " << randomSample << '\n';
 
     paramData->nCarriers.resize(pops);
 
-    const std::size_t base = 18; // first string after randomSample
+    const std::size_t base = 20; // first string after randomSample
 
     if (randomSample)
     {
         // ---- RANDOM == 1 ----
-        // Expect exactly ONE string (param_vec[18]) named "tempRead" with <pops> integers.
+        // Expect exactly ONE string (param_vec[20]) named "tempRead" with <pops> integers.
         if (param_vec.size() <= base) {
-            std::cerr << "Error: randomSample==1 requires one 'tempRead' string at param_vec[18] "
+            std::cerr << "Error: randomSample==1 requires one 'tempRead' string at param_vec[20] "
                     << "with " << pops << " integers (one per population).\n";
             exit(1);
         }
@@ -269,13 +275,13 @@ Parameters::Parameters(const char *insstring, const std::vector<std::string> &pa
     else
     {
         // ---- RANDOM == 0 ----
-        // Expect EXACTLY <pops> per-pop strings starting at param_vec[18].
+        // Expect EXACTLY <pops> per-pop strings starting at param_vec[20].
         // The FIRST one can be named "tempRead" and is simply used as Pop 0's pair.
         // Each string must contain exactly TWO integers: "<standard> <inverted>".
         if (param_vec.size() < base + pops) {
             std::size_t provided = (param_vec.size() > base) ? (param_vec.size() - base) : 0;
             std::cerr << "Error: randomSample==0 requires " << pops
-                    << " per-pop sample strings starting at param_vec[18] "
+                    << " per-pop sample strings starting at param_vec[20] "
                     << "(the first may be 'tempRead'), but only " << provided
                     << " provided.\n";
             exit(1);
@@ -371,13 +377,18 @@ void Parameters::setCarriers()
 
 void Parameters::setPhi()
 {
-    if (paramData->randPhi)
-    {
+    if (paramData->randPhi) {
+        if (paramData->phi_range.size() < 2) {
+            std::cerr << "Error: randPhi=1 requires two exponents in phi_range.\n";
+            exit(1);
+        }
         double phiExponent = randreal(paramData->phi_range[0], paramData->phi_range[1]);
         paramData->phi = pow(10, phiExponent);
-    }
-    else
-    {
+    } else {
+        if (paramData->phi_range.empty()) {
+            std::cerr << "Error: phi_range is empty; provide 'phi' in YAML.\n";
+            exit(1);
+        }
         paramData->phi = paramData->phi_range[0];
     }
 }

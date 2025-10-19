@@ -51,6 +51,7 @@ unsigned short World::simulateGeneration(vector < vector <double> > & mig_prob){
     //
     //
     DBG(">> Simulating Generation "<<worldData->generation);
+    if (inv_age >= 0) handleInversionOrigin();
     
     vector <vector<double> > migmap;
     vector<double> mRate;
@@ -107,27 +108,42 @@ unsigned short World::simulateGeneration(vector < vector <double> > & mig_prob){
                 totalC += ka;		//
             }
             
-            for(int carrierID = 0; carrierID < k; ++carrierID){
-                
-                double length = freqI * worldData->carriers->at(clustID).at(carrierID)->getHomoLength(worldData->invRange);
-                rRate.push_back( length );
+            // --- Recombination rates per carrier with correct partner karyotype ---
+            for (int carrierID = 0; carrierID < k; ++carrierID) {
+                // Is THIS carrier inverted?
+                bool invCarrier = worldData->carriers->at(clustID).at(carrierID)->getInv() == 1;
+
+                // Partner probabilities in this population:
+                //   partner_same: prob partner has same karyotype as this carrier
+                //   partner_opp : prob partner has opposite karyotype
+                double partner_same = invCarrier ? freqI : (1.0 - freqI);
+                double partner_opp  = invCarrier ? (1.0 - freqI) : freqI;
+
+                // After collapse (t >= inv_age), no heterokaryotypes anywhere.
+                if (inversionOriginHandled) {
+                    partner_opp  = 0.0;
+                    partner_same = 1.0;
+                }
+
+                // Homokaryotypic recombination rate (uses same-karyotype partner)
+                double length = partner_same *
+                    worldData->carriers->at(clustID).at(carrierID)->getHomoLength(worldData->invRange);
+                rRate.push_back(length);
                 totalR += length;
-                CDBG("				homo = " <<length)
-            }
-            
-            for(int carrierID = 0; carrierID < k; ++carrierID){
-                double hetero = (1-freqI)* worldData->carriers->at(clustID).at(carrierID)->getHeteroLength(worldData->invRange);
-                hRate.push_back( hetero );
+                CDBG("                homo = " << length)
+
+                // Heterokaryotypic recombination rate (uses opposite-karyotype partner)
+                double hetero = partner_opp *
+                    worldData->carriers->at(clustID).at(carrierID)->getHeteroLength(worldData->invRange);
+                hRate.push_back(hetero);
                 totalH += hetero;
-                CDBG("				hetero = " <<hetero)
-            }
-            
-            for(int carrierID = 0; carrierID < k; ++carrierID){
-                double doubrec = (1-freqI)* worldData->phi;
-                dRate.push_back( doubrec );
+                CDBG("                hetero = " << hetero)
+
+                // Double-cut / gene-flux rate (also needs opposite-karyotype partner)
+                double doubrec = partner_opp * worldData->phi;
+                dRate.push_back(doubrec);
                 totalD += doubrec;
-                CDBG("				doubrec = " <<doubrec)
-                
+                CDBG("                doubrec = " << doubrec)
             }
             
         }
@@ -201,9 +217,9 @@ void World::updateToNextEpoch(){
     
     if(into_epoch <= worldData->epoch_breaks.size()){
         switch (worldData->epochType[outof_epoch]) {
-            case 0://Inversion age
-                freqStepToLoss();
-                break;
+            // case 0://Inversion age
+            //     freqStepToLoss();
+            //     break;
             case 1://Speciation event
                 DBG("Going into speciation()\t")
                 speciation();
@@ -281,6 +297,22 @@ void World::speciation() {
     worldData->popSize.erase(worldData->popSize.begin() + B);
 
     unsigned int newA = (A > B) ? (A - 1) : A;
+
+    // Remap originPop across the A <- B merge and index shift removing B
+    if (inv_age >= 0) {
+        unsigned int oldOrigin = originPop;
+        if (oldOrigin == A || oldOrigin == B) {
+            originPop = newA;
+        } else if (oldOrigin > B) {
+            originPop = oldOrigin - 1;
+        }
+        if (originPop != oldOrigin) {
+            std::cerr << "[Speciation] originPop remapped: "
+                    << oldOrigin << " -> " << originPop << "\n";
+        }
+        // keep the collapse target in sync
+        worldData->originCtx = Context(originPop, 0);
+    }
 
 
     std::vector< std::shared_ptr<Chromosome> > allChr;
@@ -408,8 +440,21 @@ unsigned short World::migrateEvent(vector < vector< double> >& mig_prob, vector<
     worldData->carriers->at(c).erase(pos);
     
     //THIS FIX ASSUMES TWO POPS ONLY!!! MUST CHANGE
-    int whereto=0; if( chrom->getContext().pop==0) whereto=1;
-    
+    //int whereto=0; if( chrom->getContext().pop==0) whereto=1;
+    // Draw a destination using the row-stochastic migration matrix for the source pop
+    int from = chrom->getContext().pop;
+    double u = randreal(0,1);
+    double cum = 0.0;
+    int whereto = from;
+    for (int j = 0; j < worldData->nPops; ++j) {
+        cum += mig_prob.at(from).at(j);
+        if (u <= cum) { whereto = j; break; }
+    }
+    // If we drew "stay in same pop", undo the erase and treat as no-op migration
+    if (whereto == from) {
+        worldData->carriers->at(c).insert(worldData->carriers->at(c).begin() + who, chrom);
+        return 0;
+    }
     
     chrom->setPopulation(whereto);													// change the context of this carrier to its new population
     

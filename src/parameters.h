@@ -48,7 +48,9 @@
      std::vector<double> initialFreqs;
      std::vector<double> speciation;
      std::vector<double> demography;
-     unsigned int inv_age;
+     int inv_age = -1;
+     unsigned int originPop = 0;
+     double inv_size = 0.0;
      std::vector<double> phi_range;
      Segment invRange;
      double phi;

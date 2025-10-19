@@ -22,9 +22,11 @@ parameters = {
     "msOutput":     "1",
     "popSizeVec":   "1000 1000",
     "inv_freq":     "0.2 0.3",
+    "originPop":    "pop1",                  # 0-based index or name of origin deme (e.g. "pop2")
+    "inv_size":     "1000000",            # inversion length (bp)
     "speciation":   "0 0 0",
     "demography":   "0 0 0",
-    "inv_age":      "0",
+    "inv_age":      "-1",                 # −1 = no inversion; ≥0 = generation where inversion originates
     "migRate":      "0.02",
     "BasesPerMorgan":"1e8",
     "randPhi":      "0",
@@ -345,6 +347,125 @@ demog_str, demog_dbg = build_demography_from_demes_full(
 )
 parameters["demography"] = demog_str
 
+# --------------------------------------------------------------------
+# Inversion configuration (present-day inv_freq + originPop at inv_age)
+#   - inv_freq: present-day per-deme frequencies (0..N non-zero allowed)
+#   - originPop: REQUIRED iff inv_age >= 0 (index "2" or leaf name "pop2")
+#   - inv_age == -1 disables the boundary (ignore originPop)
+#   - This uses present-day leaf order from debug_info["leaf_order"] (C++ uses same order)
+#   - Computes origin deme's start time from demes.yaml (C++ will re-infer it)
+# --------------------------------------------------------------------
+try:
+    inv_age_val = int(parameters.get("inv_age", "-1") or "-1")
+except ValueError:
+    inv_age_val = -1  # -1 = no inversion-origin event
+
+leaf_names = debug_info["leaf_order"]  # present-day demes in C++ order
+pops = len(leaf_names)
+
+# Validate inv_freq values
+raw_inv_freq = (parameters.get("inv_freq", "") or "").strip()
+inv_freqs = [float(x) for x in raw_inv_freq.split()] if raw_inv_freq else []
+if inv_freqs:
+    if len(inv_freqs) != pops:
+        print(f"[Error] inv_freq length ({len(inv_freqs)}) != number of present-day demes ({pops}).",
+              file=sys.stderr)
+        sys.exit(1)
+    bad = [(i, f) for i, f in enumerate(inv_freqs) if not (0.0 <= f <= 1.0)]
+    if bad:
+        bad_str = ", ".join([f"leaf {i}({leaf_names[i]}): {f}" for i, f in bad])
+        print(f"[Error] inv_freq entries must be in [0,1]. Offenders: {bad_str}", file=sys.stderr)
+        sys.exit(1)
+
+if inv_age_val < 0:
+    # Feature OFF → ignore originPop if user provided it
+    if "originPop" in parameters or "originPop" in (other_params or {}):
+        print("[Warning] inv_age == -1; ignoring originPop (no inversion-origin collapse).",
+              file=sys.stderr)
+else:
+    # inv_age >= 0 → originPop is REQUIRED (index or leaf name)
+    origin_value = (other_params or {}).get("originPop", "").strip() or parameters.get("originPop", "").strip()
+    if not origin_value:
+        print("[Error] inv_age >= 0 requires 'originPop' (index or present-day leaf name) in other.yaml.",
+              file=sys.stderr)
+        sys.exit(1)
+
+    # Accept "2" or "pop2" and map to the present-day leaf index
+    if origin_value.isdigit():
+        origin_idx = int(origin_value)
+        if not (0 <= origin_idx < pops):
+            print(f"[Error] originPop index {origin_idx} out of range for {pops} leaves.",
+                  file=sys.stderr)
+            sys.exit(1)
+        origin_name = leaf_names[origin_idx]
+    else:
+        try:
+            origin_idx = leaf_names.index(origin_value)
+            origin_name = origin_value
+        except ValueError:
+            print(f"[Error] originPop name '{origin_value}' not found among present-day leaves {leaf_names}.",
+                  file=sys.stderr)
+            sys.exit(1)
+
+    parameters["originPop"] = str(origin_idx)
+    print(f"[Info] originPop set to {origin_idx} ({origin_name}). "
+          f"At inv_age={inv_age_val}, all inverted lineages collapse here and convert to standard.")
+
+    # --------------------------------------------------------------------
+    # Compute origin_start_time (your definition: use the deme's end_time)
+    # --------------------------------------------------------------------
+    if inv_age_val >= 0:
+        origin_name = leaf_names[origin_idx]  # present-day leaf name for originPop
+        by_name = {d.name: d for d in graph.demes}
+        if origin_name not in by_name:
+            print(f"[Error] originPop '{origin_name}' not found in demes.yaml.", file=sys.stderr)
+            sys.exit(1)
+
+        origin_deme = by_name[origin_name]
+        origin_start_time = float(origin_deme.end_time)
+
+        # Optional: sanity checks
+        if origin_start_time > inv_age_val:
+            print(f"[Error] origin_start_time ({origin_start_time:g}) > inv_age ({inv_age_val:g}).",
+                file=sys.stderr)
+            sys.exit(1)
+
+        print(f"[Info] origin_start_time={origin_start_time:g} "
+            f"(taken from deme '{origin_name}' end_time in demes.yaml).")
+
+# --------------------------------------------------------------------
+# invRange handling (ALWAYS pass bp to C++; C++ converts using BasesPerMorgan)
+# Precedence: explicit invRange in other.yaml > computed from inv_size
+# --------------------------------------------------------------------
+def _parse_two_floats(s: str):
+    parts = [p for p in (s or "").split() if p.strip()]
+    if len(parts) != 2:
+        raise ValueError(f"invRange must have exactly two numbers, got: '{s}'")
+    return float(parts[0]), float(parts[1])
+
+explicit_invRange = (other_params or {}).get("invRange", None)
+if explicit_invRange:
+    try:
+        L_bp, R_bp = _parse_two_floats(str(explicit_invRange))
+        if L_bp > R_bp:
+            print("[Error] invRange must be 'start end' with start <= end (in bp).", file=sys.stderr)
+            sys.exit(1)
+        parameters["invRange"] = f"{L_bp:g} {R_bp:g}"
+        print(f"[Info] Using invRange from other.yaml (bp): {parameters['invRange']}")
+    except Exception as e:
+        print(f"[Error] Bad invRange in other.yaml: {e}", file=sys.stderr)
+        sys.exit(1)
+else:
+    size_bp = float(parameters.get("inv_size", "0") or "0")
+    if size_bp > 0:
+        parameters["invRange"] = f"0 {size_bp:g}"
+        print(f"[Info] invRange derived from inv_size (bp): {parameters['invRange']}")
+    else:
+        if inv_age_val >= 0:
+            print("[Warning] inv_age ≥ 0 but neither invRange nor inv_size provided; "
+                  "C++ will use default. Consider setting inv_size or invRange.",
+                  file=sys.stderr)
+
 def _extract_default_mig_rate_from_yaml(path):
     try:
         with open(path, "r") as _f:
@@ -491,7 +612,7 @@ def _collect_per_pop_strings(parameters: dict, pops: int, random_flag: str):
 # Base (fixed-order) arguments up to and including randomSample:
 base_keys_order = [
     "seed","nruns","kingman_coal","drift_sim","msOutput",
-    "popSizeVec","inv_freq","speciation","demography","inv_age",
+    "popSizeVec","inv_freq","originPop","inv_size","speciation","demography","inv_age",
     "migRate","BasesPerMorgan","randPhi","phi","invRange","fixedSNPs",
     "n_SNPs","snpPositions","randomSample",
 ]

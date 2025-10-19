@@ -44,6 +44,14 @@ class World {
 	struct WorldData;									// This structure contains all the private data
 	unique_ptr<WorldData> worldData;					// Pointer to private data
 	cluster_t cluster;
+	// ---------------- Inversion-origin control ----------------
+	bool inversionOriginHandled = false; // has the inversion-origin collapse event been applied?
+	bool originPopInitialized = false;   // have inverted carriers been moved into originPop yet?
+	int inv_age = -1;                    // generations ago when inversion collapses
+	unsigned int originPop = 0;          // population index where inversion originates
+	double origin_start_time = 0.0;        // generations ago when originPop starts existing
+	double inv_size = 0.0;               // inversion length (bp)
+
 	
 public:
 	World(shared_ptr<Parameters::ParameterData> p);		
@@ -79,6 +87,7 @@ public:
     void updateToNextEpoch();
     void demoChange();
     void speciation();
+    void handleInversionOrigin();
 	void rebuildClustersAndCarriers();
 	shared_ptr< Chromosome> recomb_Wrap(shared_ptr<Chromosome> chrom, bool hetero, bool gflux);
     vector< shared_ptr < ARGNode > > initialARGnodes; //public vector of pointers to the original ARG nodes. For use in output of sample

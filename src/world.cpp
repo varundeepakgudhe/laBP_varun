@@ -148,10 +148,6 @@ World::World(shared_ptr<Parameters::ParameterData> p){
 
 
 
-    // inversion-age event
-    if (p->inv_age > 0) {
-        events.push_back({ double(p->inv_age), 0, 0.0, {} });
-    }
 
     // sort all events by their time
     sort(events.begin(), events.end(),
@@ -170,6 +166,15 @@ World::World(shared_ptr<Parameters::ParameterData> p){
 
     worldData->epochs_over = worldData->epoch_breaks.empty();
 
+    // ---------------- Inversion-origin initialization ----------------
+    inv_age = p->inv_age;
+    originPop = p->originPop;
+    // NOTE: origin_start_time is *re-inferred* here. If your pipeline guarantees
+    // originPop is a present-day leaf (deme end_time == 0), then origin_start_time = 0.
+    // If you later permit non-zero origin_start_time, pass it explicitly from Python.
+    origin_start_time       = 0.0;
+    originPopInitialized    = false;
+    inversionOriginHandled  = false;
 
     Context originCtx(0,0);
 	worldData->originCtx=originCtx;
@@ -461,4 +466,92 @@ Context World::randCtx(unsigned long pop){
 	cout<<"Error in randCtx\n";
 	return c;
 	
+}
+
+//----------------------------------------------------------
+// Inversion-origin handling
+//   t = 0: present
+//   t = origin_start_time: move all inverted carriers into originPop
+//   origin_start_time < t < inv_age: inversion exists only in originPop
+//   t = inv_age: collapse all inverted lineages in originPop and convert to standard
+//   t > inv_age: inverted chromosomes forbidden
+//----------------------------------------------------------
+void World::handleInversionOrigin() {
+    double t = worldData->generation;
+
+	if (inv_age < 0) return;
+	
+    // 1) Before origin_start_time → nothing special
+    if (t < origin_start_time)
+        return;
+
+	// 2) First time reaching/clearing origin_start_time → move ALL inversions to originPop
+	if (!originPopInitialized && t >= origin_start_time) {
+		std::cerr << "[InversionOrigin] t=" << t
+				<< " >= origin_start_time (" << origin_start_time
+				<< "): moving all inverted carriers into originPop=" << originPop << "\n";
+
+		for (auto &kv : cluster) {
+            const Context &ctx = kv.first;
+            if (ctx.inversion == 1 && ctx.pop != originPop) {
+                auto &vec = worldData->carriers->at(kv.second);
+                for (auto &chr : vec) chr->setContext(Context(originPop, 1));
+            }
+        }
+		// Re-bucket carriers according to the new contexts
+		rebuildClustersAndCarriers();
+
+		// ensures collapse converts to STANDARD in originPop (even if another event also happens at this t)
+		worldData->originCtx = Context(originPop, 0);
+
+		originPopInitialized = true;
+		return;
+	}
+
+
+    // 3) Between origin_start_time and inv_age → enforce that inversions remain in originPop
+    if (originPopInitialized && !inversionOriginHandled && t > origin_start_time && t < inv_age) {
+        bool moved_any = false;
+        for (auto &kv : cluster) {
+            const Context &ctx = kv.first;
+            if (ctx.inversion == 1 && ctx.pop != originPop) {
+                auto &vec = worldData->carriers->at(kv.second);
+                if (!vec.empty()) {
+                    std::cerr << "[Warning] Inverted carriers outside originPop at t=" << t
+                              << " → moving to originPop=" << originPop << "\n";
+                    for (auto &chr : vec) {
+                        chr->setContext(Context(originPop, 1));
+                    }
+                    moved_any = true;
+                }
+            }
+        }
+        if (moved_any) rebuildClustersAndCarriers();
+        return;
+    }
+
+    // 4) At or beyond inv_age (first time) → collapse all inverted lineages and convert to standard
+    if (!inversionOriginHandled && t >= inv_age) {
+		std::cerr << "[InversionOrigin] t=" << t
+				<< " >= inv_age (" << inv_age
+				<< "): collapsing and converting to standard in originPop=" << originPop << "\n";
+		// make sure collapse target is the standard context of originPop
+		worldData->originCtx = Context(originPop, 0);
+		// Note: zero out all inverted (and non-origin) frequencies, so the simulator cannot re-create inversions after inv_age.
+		freqStepToLoss();  // this calls updateContexts(originCtx) internally
+		inversionOriginHandled = true;
+		return;
+	}
+
+    // 5) After inv_age → no inversions allowed
+    if (inversionOriginHandled && t > inv_age) {
+        for (auto &kv : cluster) {
+            const Context &ctx = kv.first;
+            if (ctx.inversion == 1 && !worldData->carriers->at(kv.second).empty()) {
+                std::cerr << "[Error] Inverted chromosomes detected at t=" << t
+                          << " (> inv_age=" << inv_age << "). Aborting.\n";
+                exit(1);
+            }
+        }
+    }
 }
